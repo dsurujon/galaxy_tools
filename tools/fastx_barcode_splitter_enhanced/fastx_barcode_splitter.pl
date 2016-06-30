@@ -8,6 +8,9 @@
 #   4/6/2011 - Modified to cleanup bad barcode identifiers (esp. useful for Galaxy)
 #   4/28/2016 - Modified summary output to remove file paths and add comment
 #               character '#'
+#   Defne Surujon
+#   6/29/2016 - Added support for multiple barcodes of differing lengths
+#   NOTE: this is the version optimized for perl v5.18
 
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU Affero General Public License as
@@ -197,8 +200,8 @@ sub load_barcode_file ($) {
     if length($barcode)<=$allowed_mismatches;
 
     $barcodes_length = length($barcode) unless defined $barcodes_length;
-    die "Error: found barcodes in different lengths. this feature is not supported yet.\n"
-    unless $barcodes_length == length($barcode);
+    #die "Error: found barcodes in different lengths. this feature is not supported yet.\n"
+    #unless $barcodes_length == length($barcode);
 
     push @barcodes, [$ident, $barcode];
 
@@ -273,24 +276,27 @@ sub match_sequences {
     #Try all barcodes, find the one with the lowest mismatch count
     foreach my $barcoderef (@barcodes) {
       my ($ident, $barcode) = @{$barcoderef};
-
+	  ##DEFNE
+	  my $barlen = length($barcode);
+	  
       # Get DNA fragment (in the length of the barcodes)
       # The barcode will be tested only against this fragment
       # (no point in testing the barcode against the whole sequence)
       my $sequence_fragment;
       if ($barcodes_at_bol) {
-        $sequence_fragment = substr $seq_bases, 0, $barcodes_length;
+        $sequence_fragment = substr $seq_bases, 0, $barlen; ##barcodes_length->barlen
       } elsif ($barcodes_at_eol) {
-        $sequence_fragment = substr $seq_bases, - $barcodes_length;
+        $sequence_fragment = substr $seq_bases, - $barlen-1;##barcodes_length->barlen-1 FOR V5.18
+								##NOTE INDEXING DIFFERENCE BET V5.24 AND 5.18
       } else {
-        $sequence_fragment = substr $index_seq_bases, 0, $barcodes_length;
+        $sequence_fragment = substr $index_seq_bases, 0, $barlen;##barcodes_length->barlen
       }
 
-      my $mm = mismatch_count($sequence_fragment, $barcode) ;
-
+      my $mm = mismatch_count($sequence_fragment, $barcode)-1 ; ##NOTE -1 ADJUSTMENT FOR OLDER VERSION (V5.18)
+	  print STDERR "mismatch counts $mm for barcode $barcode and seq $sequence_fragment and barlen $barlen \n" if $debug;
       # if this is a partial match, add the non-overlap as a mismatch
       # (partial barcodes are shorter than the length of the original barcodes)
-      $mm += ($barcodes_length - length($barcode));
+      $mm += ($barlen - length($barcode));##barcodes_length->barlen
 
       if ( $mm < $best_barcode_mismatches_count ) {
         $best_barcode_mismatches_count = $mm ;
@@ -301,7 +307,7 @@ sub match_sequences {
     $best_barcode_ident = 'unmatched'
     if ( (!defined $best_barcode_ident) || $best_barcode_mismatches_count>$allowed_mismatches) ;
 
-    print STDERR "sequence $seq_bases matched barcode: $best_barcode_ident\n" if $debug;
+    print STDERR "sequence $seq_bases matched barcode $best_barcode_ident\n" if $debug;
 
     $counts{$best_barcode_ident}++;
 
@@ -456,19 +462,15 @@ sub usage()
 {
   print<<EOF;
 Barcode Splitter, by Assaf Gordon (gordon\@cshl.edu), 11sep2008
-
 This program reads FASTA/FASTQ file and splits it into several smaller files,
 Based on barcode matching.
 FASTA/FASTQ data is read from STDIN (format is auto-detected.)
 Output files will be writen to disk.
 Summary will be printed to STDOUT.
-
 usage: $0 --bcfile FILE --prefix PREFIX [--suffix SUFFIX] [--bol|--eol|--idxfile]
    [--mismatches N] [--exact] [--partial N] [--idxidstrip N]
    [--help] [--quiet] [--debug]
-
 Arguments:
-
 --bcfile FILE  - Barcodes file name. (see explanation below.)
 --prefix PREFIX  - File prefix. will be added to the output files. Can be used
       to specify output directories.
@@ -497,29 +499,23 @@ Arguments:
       (Default is to print.)
 --debug    - Print lots of useless debug information to STDERR.
 --help    - This helpful help screen.
-
 Example (Assuming 's_2_100.txt' is a FASTQ file, 'mybarcodes.txt' is
 the barcodes file):
-
   \$ cat s_2_100.txt | $0 --bcfile mybarcodes.txt --bol --mismatches 2 \\
   --prefix /tmp/bla_ --suffix ".txt"
-
 Barcode file format
 -------------------
 Barcode files are simple text files. Each line should contain an identifier
 (descriptive name for the barcode), and the barcode itself (A/C/G/T),
 separated by a TAB character. Example:
-
     #This line is a comment (starts with a 'number' sign)
     BC1 GATCT
     BC2 ATCGT
     BC3 GTGAT
     BC4 TGTCT
-
 For each barcode, a new FASTQ file will be created (with the barcode's
 identifier as part of the file name). Sequences matching the barcode
 will be stored in the appropriate file.
-
 Running the above example (assuming "mybarcodes.txt" contains the above
 barcodes), will create the following files:
   /tmp/bla_BC1.txt
@@ -528,57 +524,43 @@ barcodes), will create the following files:
   /tmp/bla_BC4.txt
   /tmp/bla_unmatched.txt
 The 'unmatched' file will contain all sequences that didn't match any barcode.
-
 Barcode matching
 ----------------
-
 ** Without partial matching:
-
 Count mismatches between the FASTA/Q sequences and the barcodes.
 The barcode which matched with the lowest mismatches count (providing the
 count is small or equal to '--mismatches N') 'gets' the sequences.
-
 Example (using the above barcodes):
 Input Sequence:
 GATTTACTATGTAAAGATAGAAGGAATAAGGTGAAG
-
 Matching with '--bol --mismatches 1':
 GATTTACTATGTAAAGATAGAAGGAATAAGGTGAAG
 GATCT (1 mismatch, BC1)
 ATCGT (4 mismatches, BC2)
 GTGAT (3 mismatches, BC3)
 TGTCT (3 mismatches, BC4)
-
 This sequence will be classified as 'BC1' (it has the lowest mismatch count).
 If '--exact' or '--mismatches 0' were specified, this sequence would be
 classified as 'unmatched' (because, although BC1 had the lowest mismatch count,
 it is above the maximum allowed mismatches).
-
 Matching with '--eol' (end of line) does the same, but from the other side
 of the sequence.
-
 ** With partial matching (very similar to indels):
-
 Same as above, with the following addition: barcodes are also checked for
 partial overlap (number of allowed non-overlapping bases is '--partial N').
-
 Example:
 Input sequence is ATTTACTATGTAAAGATAGAAGGAATAAGGTGAAG
 (Same as above, but note the missing 'G' at the beginning.)
-
 Matching (without partial overlapping) against BC1 yields 4 mismatches:
 ATTTACTATGTAAAGATAGAAGGAATAAGGTGAAG
 GATCT (4 mismatches)
-
 Partial overlapping would also try the following match:
 -ATTTACTATGTAAAGATAGAAGGAATAAGGTGAAG
 GATCT (1 mismatch)
-
 Note: scoring counts a missing base as a mismatch, so the final
 mismatch count is 2 (1 'real' mismatch, 1 'missing base' mismatch).
 If running with '--mismatches 2' (meaning allowing upto 2 mismatches) - this
 seqeunce will be classified as BC1.
-
 EOF
 
 exit 1;
