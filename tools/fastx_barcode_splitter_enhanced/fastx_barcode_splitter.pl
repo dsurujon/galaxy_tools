@@ -10,7 +10,7 @@
 #               character '#'
 #   Defne Surujon
 #   6/29/2016 - Added support for multiple barcodes of differing lengths
-#   NOTE: this is the version optimized for perl v5.18
+#   NOTE: this is the version optimized for perl v5.24
 
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU Affero General Public License as
