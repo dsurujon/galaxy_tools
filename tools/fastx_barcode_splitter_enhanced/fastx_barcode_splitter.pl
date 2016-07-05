@@ -276,7 +276,7 @@ sub match_sequences {
     #Try all barcodes, find the one with the lowest mismatch count
     foreach my $barcoderef (@barcodes) {
       my ($ident, $barcode) = @{$barcoderef};
-	  ##DEFNE
+
 	  my $barlen = length($barcode);
 	  
       # Get DNA fragment (in the length of the barcodes)
@@ -284,18 +284,18 @@ sub match_sequences {
       # (no point in testing the barcode against the whole sequence)
       my $sequence_fragment;
       if ($barcodes_at_bol) {
-        $sequence_fragment = substr $seq_bases, 0, $barlen; ##barcodes_length->barlen
+        $sequence_fragment = substr $seq_bases, 0, $barlen; 
       } elsif ($barcodes_at_eol) {
-        $sequence_fragment = substr $seq_bases, - $barlen;##barcodes_length->barlen
+        $sequence_fragment = substr $seq_bases, - $barlen;
       } else {
-        $sequence_fragment = substr $index_seq_bases, 0, $barlen;##barcodes_length->barlen
+        $sequence_fragment = substr $index_seq_bases, 0, $barlen;
       }
 
       my $mm = mismatch_count($sequence_fragment, $barcode) ;
 	  print STDERR "mismatch counts $mm for barcode $barcode and seq $sequence_fragment and barlen $barlen \n" if $debug;
       # if this is a partial match, add the non-overlap as a mismatch
       # (partial barcodes are shorter than the length of the original barcodes)
-      $mm += ($barlen - length($barcode));##barcodes_length->barlen
+      $mm += ($barlen - length($barcode));
 
       if ( $mm < $best_barcode_mismatches_count ) {
         $best_barcode_mismatches_count = $mm ;
