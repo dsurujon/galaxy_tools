@@ -10,7 +10,7 @@
 #               character '#'
 #   Defne Surujon
 #   6/29/2016 - Added support for multiple barcodes of differing lengths
-#   NOTE: this is the version optimized for perl v5.18
+#   NOTE: this is the version optimized for perl v5.24
 
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU Affero General Public License as
@@ -276,7 +276,7 @@ sub match_sequences {
     #Try all barcodes, find the one with the lowest mismatch count
     foreach my $barcoderef (@barcodes) {
       my ($ident, $barcode) = @{$barcoderef};
-	  ##DEFNE
+
 	  my $barlen = length($barcode);
 	  
       # Get DNA fragment (in the length of the barcodes)
@@ -284,19 +284,18 @@ sub match_sequences {
       # (no point in testing the barcode against the whole sequence)
       my $sequence_fragment;
       if ($barcodes_at_bol) {
-        $sequence_fragment = substr $seq_bases, 0, $barlen; ##barcodes_length->barlen
+        $sequence_fragment = substr $seq_bases, 0, $barlen; 
       } elsif ($barcodes_at_eol) {
-        $sequence_fragment = substr $seq_bases, - $barlen-1;##barcodes_length->barlen-1 FOR V5.18
-								##NOTE INDEXING DIFFERENCE BET V5.24 AND 5.18
+        $sequence_fragment = substr $seq_bases, - $barlen;
       } else {
-        $sequence_fragment = substr $index_seq_bases, 0, $barlen;##barcodes_length->barlen
+        $sequence_fragment = substr $index_seq_bases, 0, $barlen;
       }
 
-      my $mm = mismatch_count($sequence_fragment, $barcode)-1 ; ##NOTE -1 ADJUSTMENT FOR OLDER VERSION (V5.18)
+      my $mm = mismatch_count($sequence_fragment, $barcode) ;
 	  print STDERR "mismatch counts $mm for barcode $barcode and seq $sequence_fragment and barlen $barlen \n" if $debug;
       # if this is a partial match, add the non-overlap as a mismatch
       # (partial barcodes are shorter than the length of the original barcodes)
-      $mm += ($barlen - length($barcode));##barcodes_length->barlen
+      $mm += ($barlen - length($barcode));
 
       if ( $mm < $best_barcode_mismatches_count ) {
         $best_barcode_mismatches_count = $mm ;
